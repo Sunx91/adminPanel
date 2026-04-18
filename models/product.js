@@ -4,11 +4,6 @@ module.exports = (sequelize) => {
   const Product = sequelize.define(
     'Product',
     {
-      id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-      },
       name: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -26,14 +21,9 @@ module.exports = (sequelize) => {
       categoryId: {
         type: DataTypes.INTEGER,
         allowNull: true,
-        references: { model: 'categories', key: 'id' },
-        onDelete: 'SET NULL',
       },
     },
-    {
-      tableName: 'products',
-      timestamps: true,
-    }
+    { tableName: 'products' }
   );
 
   Product.associate = (models) => {

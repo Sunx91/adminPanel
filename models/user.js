@@ -7,11 +7,6 @@ module.exports = (sequelize) => {
   const User = sequelize.define(
     'User',
     {
-      id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-      },
       email: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -30,7 +25,6 @@ module.exports = (sequelize) => {
     },
     {
       tableName: 'users',
-      timestamps: true,
       hooks: {
         beforeCreate: async (user) => {
           if (user.password) {

@@ -110,22 +110,8 @@ function createAdminJs() {
   return new AdminJS({
     componentLoader,
     databases: [models],
+    resources,
     rootPath: '/admin',
-    locale: {
-      language: 'en',
-      translations: {
-        labels: {
-          navigation: 'Menu',
-          pages: 'Workspace',
-          users: 'User accounts',
-          categories: 'Categories',
-          products: 'Products',
-          orders: 'Orders',
-          order_items: 'Line items',
-          settings: 'System configuration',
-        },
-      },
-    },
     branding: {
       companyName: 'eCommerce Admin',
     },

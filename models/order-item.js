@@ -4,22 +4,13 @@ module.exports = (sequelize) => {
   const OrderItem = sequelize.define(
     'OrderItem',
     {
-      id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-      },
       orderId: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: { model: 'orders', key: 'id' },
-        onDelete: 'CASCADE',
       },
       productId: {
         type: DataTypes.INTEGER,
         allowNull: false,
-        references: { model: 'products', key: 'id' },
-        onDelete: 'RESTRICT',
       },
       quantity: {
         type: DataTypes.INTEGER,
@@ -33,7 +24,7 @@ module.exports = (sequelize) => {
     },
     {
       tableName: 'order_items',
-      timestamps: true,
+      timestamps: false,
     }
   );
 
