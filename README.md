@@ -101,6 +101,15 @@ git push origin main dev
 
 Push `main` and `dev` to your **public** GitHub repository.
 
+### Branch scope notes (for reviewers)
+
+Each feature branch carries a short scope file merged into `dev` / `main`:
+
+- [`docs/branch-scope-models.md`](docs/branch-scope-models.md)
+- [`docs/branch-scope-auth.md`](docs/branch-scope-auth.md)
+- [`docs/branch-scope-rbac.md`](docs/branch-scope-rbac.md)
+- [`docs/branch-scope-production.md`](docs/branch-scope-production.md)
+
 ## Production
 
 1. Set **`NODE_ENV=production`** on the host.
