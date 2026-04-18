@@ -1,0 +1,33 @@
+{
+  "name": "adminjs-ecom",
+  "version": "1.0.0",
+  "description": "Role-based eCommerce admin dashboard with AdminJS, Sequelize, and PostgreSQL",
+  "main": "app.js",
+  "scripts": {
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "seed": "node seed.js",
+    "build:admin": "adminjs bundle"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@adminjs/express": "^5.1.0",
+    "@adminjs/sequelize": "3.0.0",
+    "adminjs": "^6.8.7",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.21.2",
+    "express-formidable": "^1.2.0",
+    "express-session": "^1.18.1",
+    "jsonwebtoken": "^9.0.2",
+    "pg": "^8.13.1",
+    "pg-hstore": "^2.3.4",
+    "sequelize": "^6.37.5"
+  },
+  "devDependencies": {
+    "@adminjs/bundler": "^2.0.0",
+    "nodemon": "^3.1.9"
+  }
+}
