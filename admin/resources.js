@@ -40,11 +40,17 @@ const orderListBefore = async (request, context) => {
   };
 };
 
+const catalogNav = {
+  name: 'Catalog',
+  icon: 'ShoppingCart',
+};
+
 const userResource = {
   resource: User,
   options: {
+    // Top-level item (no duplicate "Users" folder wrapping "users")
     navigation: {
-      name: 'Users',
+      name: null,
       icon: 'User',
     },
     properties: {
@@ -80,6 +86,7 @@ const userResource = {
 const categoryResource = {
   resource: Category,
   options: {
+    navigation: catalogNav,
     listProperties: ['id', 'name', 'slug', 'createdAt'],
     showProperties: ['id', 'name', 'slug', 'createdAt', 'updatedAt'],
     properties: {
@@ -91,6 +98,7 @@ const categoryResource = {
 const productResource = {
   resource: Product,
   options: {
+    navigation: catalogNav,
     listProperties: ['id', 'name', 'price', 'stock', 'categoryId', 'createdAt'],
     showProperties: ['id', 'name', 'price', 'stock', 'categoryId', 'createdAt', 'updatedAt'],
     properties: {
@@ -102,6 +110,7 @@ const productResource = {
 const orderResource = {
   resource: Order,
   options: {
+    navigation: catalogNav,
     listProperties: ['id', 'status', 'total', 'userId', 'createdAt'],
     showProperties: ['id', 'status', 'total', 'userId', 'createdAt', 'updatedAt'],
     properties: {
@@ -121,6 +130,7 @@ const orderResource = {
 const orderItemResource = {
   resource: OrderItem,
   options: {
+    navigation: catalogNav,
     listProperties: ['id', 'orderId', 'productId', 'quantity', 'unitPrice', 'createdAt'],
     showProperties: ['id', 'orderId', 'productId', 'quantity', 'unitPrice', 'createdAt', 'updatedAt'],
     properties: {
@@ -142,7 +152,7 @@ const settingResource = {
   resource: Setting,
   options: {
     navigation: {
-      name: 'Settings',
+      name: null,
       icon: 'Settings',
     },
     listProperties: ['id', 'key', 'value', 'updatedAt'],

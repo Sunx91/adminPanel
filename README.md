@@ -5,41 +5,53 @@ Admin panel for a minimal eCommerce schema using **Node.js**, **Express**, **Adm
 ## Prerequisites
 
 - Node.js 18+
-- PostgreSQL (local or hosted, e.g. Supabase)
+- A **PostgreSQL** database — this repo is set up for **[Supabase](https://supabase.com/)** (still Postgres + Sequelize, as required)
 
-## Setup
+## Setup (Supabase)
 
-1. Create a database:
+1. In [Supabase](https://supabase.com/), create a project and wait until the database is ready.
 
-   ```bash
-   createdb ecommerce_admin
-   ```
+2. Open **Project Settings → Database** and copy the **URI** connection string (mode: use **Session** if you use the pooler on port `6543`, or **Direct** on `5432` if you prefer; both work with Sequelize for this app).
 
-2. Copy environment variables and edit secrets:
+3. Paste it into `.env` as `DATABASE_URL=...` and replace `[YOUR-PASSWORD]` with your actual database password.
+
+4. Copy the rest of the env file and set secrets:
 
    ```bash
    cp .env.example .env
    ```
 
-3. Install dependencies:
+5. Install dependencies:
 
    ```bash
    npm install
    ```
 
-4. **First run only** — create tables (set `DB_SYNC=true` in `.env`, start once, then set back to `false` for normal use), or use Sequelize migrations in your own workflow.
+6. **First run only** — create tables: set `DB_SYNC=true` in `.env`, run `npm run dev` once until the server starts, then set `DB_SYNC=false` again. (`seed.js` also runs `sync({ force: true })`, which recreates tables — use only when you want a clean demo database.)
 
-5. Seed demo data:
+7. Seed demo data (destructive reset of all tables):
 
    ```bash
-   node seed.js
+   npm run seed
    ```
 
-6. Start the server:
+8. Start the server:
 
    ```bash
    npm run dev
    ```
+
+If the app cannot reach Supabase from your network, check Supabase **Database → Network restrictions** and their docs on **IPv4 add-on** / connection pooling.
+
+Other hosted Postgres (not Supabase) using discrete `DB_*` variables: set `DB_SSL=true` in `.env` so Sequelize uses TLS.
+
+### Setup (local PostgreSQL instead)
+
+1. Create a database: `createdb ecommerce_admin`
+
+2. In `.env`, **do not** set `DATABASE_URL`. Use `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_HOST`, `DB_PORT`, and set `DB_SSL=false` (or omit `DATABASE_URL` and leave host as `localhost` without Supabase in the hostname).
+
+3. Continue from step 5 above.
 
 - **App**: [http://localhost:3000](http://localhost:3000) (redirects to AdminJS)
 - **Admin UI**: [http://localhost:3000/admin](http://localhost:3000/admin)
@@ -62,28 +74,47 @@ Admin panel for a minimal eCommerce schema using **Node.js**, **Express**, **Adm
 
 ## Git branch workflow (assignment)
 
-| Branch           | Purpose                          |
-|------------------|----------------------------------|
-| `main`           | Production-ready code            |
-| `dev`            | Active development               |
-| `feature/models` | Database models                  |
-| `feature/auth`   | JWT + AdminJS authentication     |
-| `feature/rbac`   | RBAC + dashboards + settings UI |
+| Branch             | Purpose                          |
+|--------------------|----------------------------------|
+| `main`             | Production-ready releases only   |
+| `dev`              | Integration of completed features |
+| `feature/models`   | Database models                    |
+| `feature/auth`     | JWT + AdminJS authentication       |
+| `feature/rbac`     | RBAC + dashboards + settings UI    |
+| `feature/*`        | Other work (e.g. production hardening) |
 
-Initialize locally:
+**Recommended flow:** open a feature branch from `dev` → implement → merge into `dev` (PR or local merge) → when stable, merge `dev` → `main` and tag a release.
+
+Example (local merges):
 
 ```bash
-git init
-git checkout -b main
-git add .
-git commit -m "Initial implementation"
-git branch dev
-git branch feature/models
-git branch feature/auth
-git branch feature/rbac
+git checkout dev
+git pull origin dev   # if using a remote
+git checkout -b feature/your-topic
+# ... commit work ...
+git checkout dev
+git merge feature/your-topic -m "Merge feature/your-topic into dev"
+git checkout main
+git merge dev -m "Release: sync main from dev"
+git push origin main dev
 ```
 
-Push `main` to a new **public** GitHub repository and merge feature branches via PRs as you complete each milestone.
+Push `main` and `dev` to your **public** GitHub repository.
+
+## Production
+
+1. Set **`NODE_ENV=production`** on the host.
+2. Set **`JWT_SECRET`** and **`COOKIE_SECRET`** to **different** random strings, **each at least 32 characters** (the app refuses shorter values in production).
+3. Set **`DATABASE_URL`** (or discrete `DB_*` + `DB_SSL` for hosted Postgres).
+4. Behind HTTPS (Render, Railway, Fly, etc.):
+   - Set **`TRUST_PROXY=true`** so Express respects `X-Forwarded-*` headers.
+   - Set **`SESSION_COOKIE_SECURE=true`** so the AdminJS session cookie is `Secure` (omit or `false` only for local HTTPS experiments).
+5. **Never** set `DB_SYNC=true` in production unless you explicitly add **`ALLOW_DB_SYNC_IN_PRODUCTION=true`** (schema should be managed via migrations or a controlled deploy step).
+6. **Do not** run `npm run seed` against production unless you set **`ALLOW_SEED_IN_PRODUCTION=true`** (it drops all tables).
+7. **`GET /health`** — use for load balancer / platform health checks.
+8. Start with **`npm run start:prod`** (or `npm start` with `NODE_ENV=production` set by the platform). Optional: [`Procfile`](Procfile) and [`render.yaml`](render.yaml) are included as examples.
+
+**Security middleware:** [`helmet`](https://helmetjs.github.io/) is enabled with **CSP disabled** so AdminJS’s UI and bundles keep working. **`POST /api/login`** is rate-limited (see `API_LOGIN_MAX_ATTEMPTS` in `.env.example`).
 
 ## Submission checklist
 
@@ -97,7 +128,7 @@ Push `main` to a new **public** GitHub repository and merge feature branches via
 - [ ] Admin role: full access + dashboard summary
 - [ ] Regular user: no Users / Settings resources; limited dashboard
 - [ ] Custom dashboard (AdminJS `dashboard` handler + component)
-- [ ] Custom Settings page (`pages.configuration`)
+- [ ] Custom Settings page (`pages.SiteConfiguration`)
 - [ ] `.env` gitignored
 - [ ] README with setup instructions
 

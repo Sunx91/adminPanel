@@ -2,6 +2,12 @@ require('dotenv').config();
 const { sequelize, User, Category, Product, Order, OrderItem, Setting } = require('./models');
 
 async function seed() {
+  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED_IN_PRODUCTION !== 'true') {
+    throw new Error(
+      'Refusing to seed in NODE_ENV=production. Set ALLOW_SEED_IN_PRODUCTION=true once if you really intend to wipe and reseed production.'
+    );
+  }
+
   await sequelize.sync({ force: true });
 
   await User.create({

@@ -1,0 +1,14 @@
+# Example Render Blueprint — adjust env vars in the dashboard.
+services:
+  - type: web
+    name: adminjs-ecom
+    runtime: node
+    buildCommand: npm install && npm run build:admin
+    startCommand: npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: TRUST_PROXY
+        value: "true"
+      - key: SESSION_COOKIE_SECURE
+        value: "true"

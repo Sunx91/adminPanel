@@ -111,7 +111,21 @@ function createAdminJs() {
     componentLoader,
     databases: [models],
     rootPath: '/admin',
-    resources,
+    locale: {
+      language: 'en',
+      translations: {
+        labels: {
+          navigation: 'Menu',
+          pages: 'Workspace',
+          users: 'User accounts',
+          categories: 'Categories',
+          products: 'Products',
+          orders: 'Orders',
+          order_items: 'Line items',
+          settings: 'System configuration',
+        },
+      },
+    },
     branding: {
       companyName: 'eCommerce Admin',
     },
@@ -120,8 +134,7 @@ function createAdminJs() {
       handler: dashboardHandler,
     },
     pages: {
-      configuration: {
-        label: 'App settings',
+      SiteConfiguration: {
         component: SettingsPageComponent,
         icon: 'Settings',
         handler: settingsPageHandler,

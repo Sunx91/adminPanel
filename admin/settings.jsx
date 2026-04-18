@@ -29,7 +29,7 @@ const EcomSettingsPage = () => {
     setError(null);
     const api = new ApiClient();
     api
-      .getPage({ pageName: 'configuration' })
+      .getPage({ pageName: 'SiteConfiguration' })
       .then((res) => {
         setRows(res.data?.settings || []);
       })
@@ -52,7 +52,7 @@ const EcomSettingsPage = () => {
     data.append('value', value);
     try {
       const res = await api.getPage({
-        pageName: 'configuration',
+        pageName: 'SiteConfiguration',
         method: 'post',
         data,
       });
@@ -77,7 +77,7 @@ const EcomSettingsPage = () => {
     data.append('value', newValue);
     try {
       const res = await api.getPage({
-        pageName: 'configuration',
+        pageName: 'SiteConfiguration',
         method: 'post',
         data,
       });
