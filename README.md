@@ -55,7 +55,18 @@ Other hosted Postgres (not Supabase) using discrete `DB_*` variables: set `DB_SS
 
 - **App**: [http://localhost:3000](http://localhost:3000) (redirects to AdminJS)
 - **Admin UI**: [http://localhost:3000/admin](http://localhost:3000/admin)
-- **API login**: `POST /api/login` with JSON `{ "email", "password" }` → `{ token, user }`
+
+### HTTP API (JWT)
+
+Shared logic lives in [`services/authService.js`](services/authService.js) and is used by both **`POST /api/login`** and the **AdminJS** login form (same password rules and bcrypt path).
+
+| Method | Path | Description |
+|--------|------|-------------|
+| `POST` | `/api/login` | Body: `{ "email", "password" }`. Success: `{ success, data: { token, tokenType, expiresIn, user } }`. Errors: `{ success: false, error: { code, message } }`. |
+| `GET` | `/api/me` | Header: `Authorization: Bearer <token>`. Returns `{ success, data: { user } }` from the database (fresh role). |
+
+- **Email** matching is **case-insensitive** on login.
+- **JWT** includes fixed **`iss`** (`adminjs-ecom`); override lifetime with **`JWT_EXPIRES_IN`** (default `8h`).
 
 ### Seed accounts
 

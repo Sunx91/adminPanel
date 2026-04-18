@@ -1,12 +1,12 @@
 require('dotenv').config();
 const express = require('express');
 const helmet = require('helmet');
-const bcrypt = require('bcrypt');
 const AdminJS = require('adminjs');
 const AdminJSExpress = require('@adminjs/express');
 const AdminJSSequelize = require('@adminjs/sequelize');
-const { sequelize, User } = require('./models');
+const { sequelize } = require('./models');
 const authRouter = require('./routes/auth');
+const authService = require('./services/authService');
 const { createAdminJs } = require('./admin/setup');
 const { validateEnv, isProduction } = require('./config/env');
 const { apiLoginLimiter } = require('./middleware/apiLimiter');
@@ -60,17 +60,7 @@ async function start() {
   const adminRouter = AdminJSExpress.buildAuthenticatedRouter(
     adminJs,
     {
-      authenticate: async (email, password) => {
-        const user = await User.findOne({ where: { email: String(email).trim() } });
-        if (!user) {
-          return null;
-        }
-        const ok = await bcrypt.compare(password, user.password);
-        if (!ok) {
-          return null;
-        }
-        return { id: user.id, email: user.email, role: user.role };
-      },
+      authenticate: authService.authenticateAdminPanel,
       cookieName: 'adminjs',
       cookiePassword: process.env.COOKIE_SECRET,
     },
