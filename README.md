@@ -1,146 +1,257 @@
 # Role-Based eCommerce Admin Dashboard
 
-Admin panel for a minimal eCommerce schema using **Node.js**, **Express**, **AdminJS**, **Sequelize**, **PostgreSQL**, **bcrypt**, and **JWT**.
+## 1. Title + badges
 
-## Prerequisites
+![Node.js](https://img.shields.io/badge/node-%3E%3D18-339933?logo=nodedotjs&logoColor=white)
+![Express](https://img.shields.io/badge/Express-4.x-000000?logo=express&logoColor=white)
+![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15%2B-4169E1?logo=postgresql&logoColor=white)
+![Sequelize](https://img.shields.io/badge/Sequelize-ORM-52B0E7?logo=sequelize&logoColor=white)
+![AdminJS](https://img.shields.io/badge/AdminJS-6.x-6B47ED)
+![Coursework](https://img.shields.io/badge/type-coursework-blue)
 
-- Node.js 18+
-- A **PostgreSQL** database — this repo is set up for **[Supabase](https://supabase.com/)** (still Postgres + Sequelize, as required)
+## 2. Description
 
-## Setup (Supabase)
+A **secure admin panel** for a minimal **eCommerce** domain: user accounts, product catalog, customer orders, and key-value settings. The server is **Node.js + Express**, persistence is **Sequelize + PostgreSQL**, the UI is **AdminJS** (session login), and the JSON API uses **bcrypt** + **JWT** for programmatic auth. **Role-based access control** hides admin-only resources from regular users and scopes orders to the signed-in customer.
 
-1. In [Supabase](https://supabase.com/), create a project and wait until the database is ready.
+This project targets coursework / portfolio demos: it is **not** a full marketplace (payments, cart APIs, inventory locking) but it models the **core relational data** shops rely on.
 
-2. Open **Project Settings → Database** and copy the **URI** connection string (mode: use **Session** if you use the pooler on port `6543`, or **Direct** on `5432` if you prefer; both work with Sequelize for this app).
+## 3. Tech stack
 
-3. Paste it into `.env` as `DATABASE_URL=...` and replace `[YOUR-PASSWORD]` with your actual database password.
+| Layer | Technology |
+|--------|------------|
+| Runtime | Node.js 18+ |
+| HTTP | Express 4 |
+| Admin UI | AdminJS 6, `@adminjs/express`, `@adminjs/sequelize` |
+| ORM / DB | Sequelize 6, `pg`, PostgreSQL |
+| Auth | bcrypt (passwords), `jsonwebtoken` (API), `express-session` (AdminJS) |
+| Config | dotenv |
+| Security | helmet (CSP disabled for AdminJS), express-rate-limit (login) |
+| Dev | nodemon, `@adminjs/bundler` |
 
-4. Copy the rest of the env file and set secrets:
+## 4. Features
 
-   ```bash
-   cp .env.example .env
-   ```
+- **Six Sequelize models**: `User`, `Category`, `Product`, `Order`, `OrderItem`, `Setting` with associations (catalog, orders, line items).
+- **AdminJS** registers all models with sensible list/show columns and navigation grouping (**Catalog**).
+- **Password field** hidden from list / show / filter / edit; new users created in Admin can get an auto-generated password via a `new` action hook when the field is empty.
+- **JWT** `POST /api/login` for API clients; **AdminJS** uses **email/password** + **session** (same user table).
+- **RBAC**: `admin` sees all resources, custom **dashboard** (stats vs. recent orders), **SiteConfiguration** page for settings; `user` does not see User or Setting resources; **orders** filtered to `userId`; **OrderItem** list is admin-only (line items still visible on own order detail).
+- **Health** endpoint for deployments; **production guards** for `DB_SYNC` and destructive `seed` (see [Environment Variables](#8-environment-variables)).
 
-5. Install dependencies:
+## 5. Project architecture & project structure
 
-   ```bash
-   npm install
-   ```
+### Architecture (high level)
 
-6. **First run only** — create tables: set `DB_SYNC=true` in `.env`, run `npm run dev` once until the server starts, then set `DB_SYNC=false` again. (`seed.js` also runs `sync({ force: true })`, which recreates tables — use only when you want a clean demo database.)
+```mermaid
+flowchart LR
+  subgraph client [Client]
+    Browser[Browser]
+  end
+  subgraph express [Express]
+    API["/api JSON routes"]
+    Admin["/admin AdminJS"]
+    Health["/health"]
+  end
+  subgraph auth [Auth]
+    JWT[JWT issue]
+    Session[Session cookie]
+    Bcrypt[bcrypt verify]
+  end
+  subgraph data [Data]
+    PG[(PostgreSQL)]
+    Seq[Sequelize]
+  end
+  Browser --> API
+  Browser --> Admin
+  Browser --> Health
+  API --> Bcrypt
+  API --> JWT
+  Admin --> Session
+  Admin --> Bcrypt
+  API --> Seq
+  Admin --> Seq
+  Seq --> PG
+```
 
-7. Seed demo data (destructive reset of all tables):
+### Repository layout
 
-   ```bash
-   npm run seed
-   ```
+```text
+adminPanel/
+├── app.js                 # Express app, helmet, AdminJS router, lifecycle
+├── seed.js                # Destructive demo seed (sync force + inserts)
+├── package.json
+├── Procfile               # Example process type (e.g. Heroku)
+├── render.yaml            # Example Render blueprint
+├── config/
+│   ├── database.js        # Sequelize + SSL/pool + DATABASE_URL or DB_*
+│   └── env.js             # Startup env validation (production rules)
+├── middleware/
+│   └── apiLimiter.js      # Rate limit for POST /api/login
+├── models/                # Sequelize models + index.js associations
+├── routes/
+│   └── auth.js            # POST /api/login
+├── admin/
+│   ├── setup.js           # AdminJS instance, dashboard + SiteConfiguration page
+│   ├── resources.js       # Per-resource RBAC + navigation
+│   ├── dashboard.jsx      # Custom dashboard UI
+│   └── settings.jsx       # Custom settings UI
+└── docs/                  # Branch scope notes, publish checklist
+```
 
-8. Start the server:
+## 6. Prerequisites
 
-   ```bash
-   npm run dev
-   ```
+- **Node.js** 18 or newer  
+- **PostgreSQL** database (local, [Supabase](https://supabase.com/), Neon, Railway, etc.)  
+- **npm** (ships with Node)  
+- Optional: **Docker** if you prefer containerized Postgres  
 
-If the app cannot reach Supabase from your network, check Supabase **Database → Network restrictions** and their docs on **IPv4 add-on** / connection pooling.
+## 7. Installation
 
-Other hosted Postgres (not Supabase) using discrete `DB_*` variables: set `DB_SSL=true` in `.env` so Sequelize uses TLS.
+```bash
+git clone <your-repo-url>
+cd adminPanel
+cp .env.example .env
+# Edit .env — see section 8
 
-### Setup (local PostgreSQL instead)
+npm install
+```
 
-1. Create a database: `createdb ecommerce_admin`
+**Development server**
 
-2. In `.env`, **do not** set `DATABASE_URL`. Use `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_HOST`, `DB_PORT`, and set `DB_SSL=false` (or omit `DATABASE_URL` and leave host as `localhost` without Supabase in the hostname).
+```bash
+npm run dev
+```
 
-3. Continue from step 5 above.
+- App root redirects to **`/admin`**.  
+- Admin UI: `http://localhost:<PORT>/admin` (default port **3000**).
 
-- **App**: [http://localhost:3000](http://localhost:3000) (redirects to AdminJS)
-- **Admin UI**: [http://localhost:3000/admin](http://localhost:3000/admin)
-- **API login**: `POST /api/login` with JSON `{ "email", "password" }` → `{ token, user }`
+**Production-style start** (set env on the host or use `start:prod` if your shell supports inline `NODE_ENV`):
 
-### Seed accounts
+```bash
+npm start
+# or
+npm run start:prod
+```
 
-| Role  | Email               | Password  |
-|-------|---------------------|-----------|
-| admin | admin@example.com   | admin123  |
-| user  | user@example.com    | user123   |
+**AdminJS client bundles** are built when the server starts in development; for some hosts you may run `npm run build:admin` during deploy (see `render.yaml` example).
 
-## Features
+## 8. Environment variables
 
-- Six Sequelize models: `User`, `Category`, `Product`, `Order`, `OrderItem`, `Setting`
-- AdminJS with authenticated router (session); `POST /api/login` returns a JWT
-- Password hashes hidden from list/show/filter; new users created in Admin get a random initial password if the field is left empty (change via DB or future flow)
-- **Admin**: all resources, full dashboard stats, **Configuration** custom page for key/value settings
-- **User**: no Users or Settings resources in the nav; orders scoped to their account; **OrderItem** list is admin-only (line items visible on their order detail)
+Copy [`.env.example`](.env.example) to `.env` and configure:
 
-## Git branch workflow (assignment)
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PORT` | No | HTTP port (default `3000`) |
+| `NODE_ENV` | Recommended | `development` / `production` |
+| `DATABASE_URL` | One of URL **or** `DB_*` | Full Postgres URI (e.g. Supabase pooler or direct) |
+| `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_HOST`, `DB_PORT` | If no `DATABASE_URL` | Discrete connection fields |
+| `DB_SSL` | For local discrete vars | `false` for localhost; Supabase URL auto-SSL in code |
+| `DB_POOL_MAX`, `DB_POOL_MIN`, … | No | Sequelize pool tuning |
+| `JWT_SECRET` | Yes | Secret for signing JWTs |
+| `COOKIE_SECRET` | Yes | Session / AdminJS cookie signing (must differ from `JWT_SECRET` in production) |
+| `DB_SYNC` | No | `true` only in dev to `sync({ alter: true })` on boot — blocked in production unless `ALLOW_DB_SYNC_IN_PRODUCTION=true` |
+| `TRUST_PROXY` | Behind reverse proxy | `true` so Express trusts `X-Forwarded-*` |
+| `SESSION_COOKIE_SECURE` | HTTPS | `true` in production behind TLS |
+| `SESSION_MAX_AGE_MS` | No | Admin session duration (ms) |
+| `API_LOGIN_MAX_ATTEMPTS` | No | Rate limit window cap for `/api/login` |
+| `ALLOW_SEED_IN_PRODUCTION` | Danger | Must be `true` to allow `npm run seed` when `NODE_ENV=production` |
 
-| Branch             | Purpose                          |
-|--------------------|----------------------------------|
-| `main`             | Production-ready releases only   |
-| `dev`              | Integration of completed features |
-| `feature/models`   | Database models                    |
-| `feature/auth`     | JWT + AdminJS authentication       |
-| `feature/rbac`     | RBAC + dashboards + settings UI    |
-| `feature/*`        | Other work (e.g. production hardening) |
+**Production rules** (enforced in [`config/env.js`](config/env.js)): `JWT_SECRET` and `COOKIE_SECRET` must each be **≥ 32 characters** and **not identical** when `NODE_ENV=production`.
 
-**Recommended flow:** open a feature branch from `dev` → implement → merge into `dev` (PR or local merge) → when stable, merge `dev` → `main` and tag a release.
+## 9. Database setup
 
-Example (local merges):
+### Option A — Supabase (recommended)
+
+1. Create a project at [supabase.com](https://supabase.com/).  
+2. **Project Settings → Database** → copy the **URI** (prefer **Session pooler** / IPv4 if direct host times out).  
+3. Set `DATABASE_URL` in `.env` and replace the password placeholder.  
+
+### Option B — Local PostgreSQL
+
+```bash
+createdb ecommerce_admin
+```
+
+Set `DB_NAME`, `DB_USER`, `DB_PASS`, `DB_HOST`, `DB_PORT`, and `DB_SSL=false` in `.env`. **Do not** set `DATABASE_URL`.
+
+### Schema & demo data
+
+1. **Optional first boot (dev):** set `DB_SYNC=true`, run `npm run dev` once, then set `DB_SYNC=false`.  
+2. **Seed demo rows** (drops and recreates **all** tables):
+
+```bash
+npm run seed
+```
+
+See [Seed Data](#12-seed-data) for accounts. **Never** run seed against production without understanding `ALLOW_SEED_IN_PRODUCTION`.
+
+## 10. API endpoints
+
+Base URL: `http://localhost:<PORT>` (replace `<PORT>` with your `PORT`, default `3000`).
+
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/health` | None | `{ status, uptime }` for load balancers |
+| `GET` | `/` | None | Redirects to `/admin` |
+| `POST` | `/api/login` | None | JSON body `{ "email", "password" }`. Success: `{ "token", "user": { id, email, role } }`. Errors: `400` / `401` / `500` with `{ "error" }`. Rate-limited. |
+| `*` | `/admin/*` | Session | AdminJS UI (login form → session cookie) |
+
+AdminJS also exposes internal JSON under `/admin/api/...` for the SPA (dashboard, resources, custom page **SiteConfiguration**).
+
+## 11. Roles & permissions
+
+| Role | AdminJS | Notes |
+|------|---------|--------|
+| **admin** | Full CRUD on **User**, **Category**, **Product**, **Order**, **OrderItem**, **Setting** | Dashboard shows aggregate stats (users, orders, products, categories, revenue). **SiteConfiguration** page and Setting resource. |
+| **user** | **No** User or Setting resources in the nav | **Orders**: list filtered to own `userId`; **show** only own orders. **OrderItem**: no list access; **show** allowed when the parent order belongs to the user. **Categories** & **Products** visible for catalog context. Dashboard shows profile + recent orders. |
+
+Implementation: [`admin/resources.js`](admin/resources.js) (`isAccessible`, `list` `before` hooks, `navigation` groups).
+
+## 12. Seed data
+
+Run **`npm run seed`** after DB is reachable. This runs `sequelize.sync({ force: true })` — **all tables are dropped and recreated**.
+
+| Entity | Summary |
+|--------|---------|
+| Users | `admin@example.com` (role `admin`), `user@example.com` (role `user`) |
+| Passwords | `admin123` / `user123` (plain in seed; stored hashed via model hooks) |
+| Catalog | Categories *Electronics*, *Books*; sample products |
+| Orders | Two orders for the seeded `user`, with line items |
+| Settings | `site_name`, `tax_rate`, `currency` |
+
+## 13. Branch strategy
+
+| Branch | Purpose |
+|--------|---------|
+| `main` | Production-ready releases |
+| `dev` | Integration branch for completed features |
+| `feature/models` | Database / Sequelize model work |
+| `feature/auth` | JWT + AdminJS authentication |
+| `feature/rbac` | RBAC, dashboards, custom pages |
+| `feature/production-readiness` | Ops, env validation, deploy examples |
+
+**Workflow:** branch from `dev` → implement on `feature/*` → merge into `dev` → when stable, merge `dev` into `main` and push.
 
 ```bash
 git checkout dev
-git pull origin dev   # if using a remote
+git pull origin dev
 git checkout -b feature/your-topic
-# ... commit work ...
+# ... commits ...
 git checkout dev
-git merge feature/your-topic -m "Merge feature/your-topic into dev"
+git merge feature/your-topic -m "Merge feature/your-topic"
 git checkout main
-git merge dev -m "Release: sync main from dev"
+git merge dev -m "Release: merge dev into main"
 git push origin main dev
 ```
 
-Push `main` and `dev` to your **public** GitHub repository.
+Optional reviewer notes: [`docs/branch-scope-models.md`](docs/branch-scope-models.md), [`docs/branch-scope-auth.md`](docs/branch-scope-auth.md), [`docs/branch-scope-rbac.md`](docs/branch-scope-rbac.md), [`docs/branch-scope-production.md`](docs/branch-scope-production.md), [`docs/PUBLISH_CHECKLIST.md`](docs/PUBLISH_CHECKLIST.md).
 
-### Branch scope notes (for reviewers)
+---
 
-Each feature branch carries a short scope file merged into `dev` / `main`:
+## Assignment checklist (quick reference)
 
-- [`docs/branch-scope-models.md`](docs/branch-scope-models.md)
-- [`docs/branch-scope-auth.md`](docs/branch-scope-auth.md)
-- [`docs/branch-scope-rbac.md`](docs/branch-scope-rbac.md)
-- [`docs/branch-scope-production.md`](docs/branch-scope-production.md)
-
-## Production
-
-1. Set **`NODE_ENV=production`** on the host.
-2. Set **`JWT_SECRET`** and **`COOKIE_SECRET`** to **different** random strings, **each at least 32 characters** (the app refuses shorter values in production).
-3. Set **`DATABASE_URL`** (or discrete `DB_*` + `DB_SSL` for hosted Postgres).
-4. Behind HTTPS (Render, Railway, Fly, etc.):
-   - Set **`TRUST_PROXY=true`** so Express respects `X-Forwarded-*` headers.
-   - Set **`SESSION_COOKIE_SECURE=true`** so the AdminJS session cookie is `Secure` (omit or `false` only for local HTTPS experiments).
-5. **Never** set `DB_SYNC=true` in production unless you explicitly add **`ALLOW_DB_SYNC_IN_PRODUCTION=true`** (schema should be managed via migrations or a controlled deploy step).
-6. **Do not** run `npm run seed` against production unless you set **`ALLOW_SEED_IN_PRODUCTION=true`** (it drops all tables).
-7. **`GET /health`** — use for load balancer / platform health checks.
-8. Start with **`npm run start:prod`** (or `npm start` with `NODE_ENV=production` set by the platform). Optional: [`Procfile`](Procfile) and [`render.yaml`](render.yaml) are included as examples.
-
-**Security middleware:** [`helmet`](https://helmetjs.github.io/) is enabled with **CSP disabled** so AdminJS’s UI and bundles keep working. **`POST /api/login`** is rate-limited (see `API_LOGIN_MAX_ATTEMPTS` in `.env.example`).
-
-## Submission checklist
-
-- [ ] Public GitHub repository created
-- [ ] Branch strategy (`main`, `dev`, `feature/*`) followed
-- [ ] All six models created
-- [ ] AdminJS configured with all models and relationships
-- [ ] Password field not exposed in list/show/filter
-- [ ] `POST /api/login` returns JWT
-- [ ] AdminJS protected with login
-- [ ] Admin role: full access + dashboard summary
-- [ ] Regular user: no Users / Settings resources; limited dashboard
-- [ ] Custom dashboard (AdminJS `dashboard` handler + component)
-- [ ] Custom Settings page (`pages.SiteConfiguration`)
-- [ ] `.env` gitignored
-- [ ] README with setup instructions
-
-## Optional: deploy
-
-Use Railway, Render, or similar: set the same environment variables, use a managed Postgres URL, and run `node seed.js` once against production if you need demo data.
+- [ ] Public GitHub repository  
+- [ ] Branch strategy (`main`, `dev`, `feature/*`)  
+- [ ] Six models + AdminJS resources + hidden password fields  
+- [ ] `POST /api/login` + JWT; AdminJS session login  
+- [ ] Admin vs user RBAC + custom dashboard + SiteConfiguration page  
+- [ ] `.env` gitignored; README complete  
