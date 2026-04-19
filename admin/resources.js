@@ -87,8 +87,8 @@ const categoryResource = {
   resource: Category,
   options: {
     navigation: catalogNav,
-    listProperties: ['id', 'name', 'slug', 'createdAt'],
-    showProperties: ['id', 'name', 'slug', 'createdAt', 'updatedAt'],
+    listProperties: ['id', 'name', 'createdAt'],
+    showProperties: ['id', 'name', 'createdAt', 'updatedAt'],
     properties: {
       products: { isVisible: { list: true, show: true } },
     },
@@ -131,8 +131,8 @@ const orderItemResource = {
   resource: OrderItem,
   options: {
     navigation: catalogNav,
-    listProperties: ['id', 'orderId', 'productId', 'quantity', 'unitPrice', 'createdAt'],
-    showProperties: ['id', 'orderId', 'productId', 'quantity', 'unitPrice', 'createdAt', 'updatedAt'],
+    listProperties: ['id', 'orderId', 'productId', 'quantity', 'unitPrice'],
+    showProperties: ['id', 'orderId', 'productId', 'quantity', 'unitPrice'],
     properties: {
       order: { isVisible: { list: true, show: true, filter: true } },
       product: { isVisible: { list: true, show: true, filter: true } },

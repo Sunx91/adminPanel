@@ -5,7 +5,6 @@
   "main": "app.js",
   "scripts": {
     "start": "node app.js",
-    "start:prod": "NODE_ENV=production node app.js",
     "dev": "nodemon app.js",
     "seed": "node seed.js",
     "build:admin": "adminjs bundle"
@@ -20,8 +19,6 @@
     "bcrypt": "^5.1.1",
     "dotenv": "^16.4.5",
     "express": "^4.21.2",
-    "express-rate-limit": "^7.5.0",
-    "helmet": "^8.0.0",
     "express-formidable": "^1.2.0",
     "express-session": "^1.18.1",
     "jsonwebtoken": "^9.0.2",
