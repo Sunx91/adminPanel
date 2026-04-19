@@ -1,37 +1,28 @@
 import React, { useEffect, useState } from 'react';
-import {
-  Box,
-  H2,
-  Text,
-  Button,
-  Input,
-  Label,
-  Loader,
-  MessageBox,
-  Table,
-  TableHead,
-  TableRow,
-  TableCell,
-  TableBody,
-} from '@adminjs/design-system';
+import { Box, H2, Text, Button, Input, Label, Loader, MessageBox } from '@adminjs/design-system';
 import { ApiClient } from 'adminjs';
 
 const EcomSettingsPage = () => {
-  const [rows, setRows] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [notice, setNotice] = useState(null);
-  const [newKey, setNewKey] = useState('');
-  const [newValue, setNewValue] = useState('');
+  const [taxRate, setTaxRate] = useState('0.08');
+  const [currency, setCurrency] = useState('USD');
+  const [siteName, setSiteName] = useState('');
+  const [supportEmail, setSupportEmail] = useState('');
 
   const load = () => {
     setLoading(true);
     setError(null);
     const api = new ApiClient();
     api
-      .getPage({ pageName: 'SiteConfiguration' })
+      .getPage({ pageName: 'Settings' })
       .then((res) => {
-        setRows(res.data?.settings || []);
+        const s = res.data?.settings || {};
+        setTaxRate(String(s.tax_rate ?? '0.08'));
+        setCurrency(String(s.currency ?? 'USD'));
+        setSiteName(String(s.site_name ?? 'Demo eCommerce'));
+        setSupportEmail(String(s.support_email ?? 'support@example.com'));
       })
       .catch((e) => {
         setError(e?.response?.data?.error || e?.message || 'Failed to load settings');
@@ -43,52 +34,34 @@ const EcomSettingsPage = () => {
     load();
   }, []);
 
-  const saveRow = async (id, key, value) => {
+  const save = async () => {
+    setError(null);
     setNotice(null);
     const api = new ApiClient();
     const data = new FormData();
-    data.append('id', String(id));
-    data.append('key', key);
-    data.append('value', value);
+    data.append('tax_rate', taxRate);
+    data.append('currency', currency.trim().toUpperCase());
+
     try {
       const res = await api.getPage({
-        pageName: 'SiteConfiguration',
+        pageName: 'Settings',
         method: 'post',
         data,
       });
-      if (res.data?.settings) {
-        setRows(res.data.settings);
+
+      if (res.data?.ok === false) {
+        setError(res.data.error || 'Save failed');
+        return;
       }
-      setNotice('Saved.');
+
+      setNotice('Settings updated.');
+      const s = res.data?.settings || {};
+      setTaxRate(String(s.tax_rate ?? taxRate));
+      setCurrency(String(s.currency ?? currency).toUpperCase());
+      setSiteName(String(s.site_name ?? siteName));
+      setSupportEmail(String(s.support_email ?? supportEmail));
     } catch (e) {
       setError(e?.response?.data?.error || e?.message || 'Save failed');
-    }
-  };
-
-  const createRow = async () => {
-    setNotice(null);
-    if (!newKey.trim()) {
-      setError('Key is required');
-      return;
-    }
-    const api = new ApiClient();
-    const data = new FormData();
-    data.append('key', newKey.trim());
-    data.append('value', newValue);
-    try {
-      const res = await api.getPage({
-        pageName: 'SiteConfiguration',
-        method: 'post',
-        data,
-      });
-      if (res.data?.settings) {
-        setRows(res.data.settings);
-      }
-      setNewKey('');
-      setNewValue('');
-      setNotice('Setting created or updated.');
-    } catch (e) {
-      setError(e?.response?.data?.error || e?.message || 'Create failed');
     }
   };
 
@@ -101,73 +74,56 @@ const EcomSettingsPage = () => {
   }
 
   return (
-    <Box p="xxl">
-      <H2 mb="lg">Configuration</H2>
+    <Box p="xxl" maxWidth={760}>
+      <H2 mb="lg">Settings</H2>
+
       {error && (
         <Box mb="md">
           <MessageBox message={error} variant="danger" onCloseClick={() => setError(null)} />
         </Box>
       )}
+
       {notice && (
         <Box mb="md">
           <MessageBox message={notice} variant="success" onCloseClick={() => setNotice(null)} />
         </Box>
       )}
-      <Box mb="xl" p="lg" bg="white" boxShadow="card" borderRadius="default">
-        <Text mb="md">Add or update a key-value setting.</Text>
-        <Box display="flex" flexWrap="wrap" style={{ gap: 12 }} alignItems="flex-end">
-          <Box flexGrow={1} minWidth={180}>
-            <Label>Key</Label>
-            <Input width={1} value={newKey} onChange={(e) => setNewKey(e.target.value)} />
-          </Box>
-          <Box flexGrow={2} minWidth={220}>
-            <Label>Value</Label>
-            <Input width={1} value={newValue} onChange={(e) => setNewValue(e.target.value)} />
-          </Box>
-          <Button variant="primary" onClick={createRow}>
-            Save key
-          </Button>
+
+      <Box p="xl" bg="white" boxShadow="card" borderRadius="default">
+        <Text mb="lg" color="grey60">
+          Editable settings are stored in the database. Site name and support email are read from
+          environment variables.
+        </Text>
+
+        <Box mb="lg">
+          <Label>Tax Rate</Label>
+          <Input width={1} value={taxRate} onChange={(e) => setTaxRate(e.target.value)} />
         </Box>
-      </Box>
-      <Box bg="white" boxShadow="card" borderRadius="default" overflow="hidden">
-        <Table>
-          <TableHead>
-            <TableRow>
-              <TableCell>Key</TableCell>
-              <TableCell>Value</TableCell>
-              <TableCell width={120} />
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {rows.map((row) => (
-              <SettingRow key={row.id} row={row} onSave={saveRow} />
-            ))}
-          </TableBody>
-        </Table>
+
+        <Box mb="lg">
+          <Label>Currency</Label>
+          <Input
+            width={1}
+            value={currency}
+            onChange={(e) => setCurrency(e.target.value.toUpperCase())}
+          />
+        </Box>
+
+        <Box mb="lg">
+          <Label>SITE_NAME (read-only)</Label>
+          <Input width={1} value={siteName} disabled />
+        </Box>
+
+        <Box mb="xl">
+          <Label>SUPPORT_EMAIL (read-only)</Label>
+          <Input width={1} value={supportEmail} disabled />
+        </Box>
+
+        <Button variant="primary" onClick={save}>
+          Save Settings
+        </Button>
       </Box>
     </Box>
-  );
-};
-
-const SettingRow = ({ row, onSave }) => {
-  const [value, setValue] = useState(row.value || '');
-
-  useEffect(() => {
-    setValue(row.value || '');
-  }, [row.value]);
-
-  return (
-    <TableRow>
-      <TableCell>{row.key}</TableCell>
-      <TableCell>
-        <Input width={1} value={value} onChange={(e) => setValue(e.target.value)} />
-      </TableCell>
-      <TableCell>
-        <Button size="sm" onClick={() => onSave(row.id, row.key, value)}>
-          Save
-        </Button>
-      </TableCell>
-    </TableRow>
   );
 };
 

@@ -30,7 +30,7 @@ async function verifyCredentials(email, password) {
 }
 
 function toPublicUser(user) {
-  return { id: user.id, email: user.email, role: user.role };
+  return { id: user.id, name: user.name || '', email: user.email, role: user.role };
 }
 
 function issueAccessToken(user) {
