@@ -19,6 +19,8 @@ AdminJS.registerAdapter({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+app.disable('x-powered-by');
+
 if (process.env.TRUST_PROXY === 'true') {
   app.set('trust proxy', 1);
 }
