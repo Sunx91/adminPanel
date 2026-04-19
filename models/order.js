@@ -5,9 +5,12 @@ module.exports = (sequelize) => {
     'Order',
     {
       status: {
-        type: DataTypes.STRING(32),
+        type: DataTypes.ENUM('pending', 'paid', 'cancelled'),
         allowNull: false,
         defaultValue: 'pending',
+        validate: {
+          isIn: [['pending', 'paid', 'cancelled']],
+        },
       },
       total: {
         type: DataTypes.DECIMAL(10, 2),

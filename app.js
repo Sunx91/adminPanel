@@ -69,7 +69,7 @@ async function start() {
         if (!user) return null;
         const ok = await bcrypt.compare(password, user.password);
         if (!ok) return null;
-        return { id: user.id, email: user.email, role: user.role };
+        return { id: user.id, name: user.name || '', email: user.email, role: user.role };
       },
       cookieName: 'adminjs',
       cookiePassword: process.env.COOKIE_SECRET,
@@ -83,6 +83,11 @@ async function start() {
   );
 
   app.use(adminJs.options.rootPath, adminRouter);
+
+  const adminRoot = String(adminJs.options.rootPath || '/admin').replace(/\/$/, '') || '/admin';
+  app.get('/login', (_req, res) => {
+    res.redirect(302, `${adminRoot}/login`);
+  });
 
   app.get('/', (_req, res) => {
     res.redirect(adminJs.options.rootPath);

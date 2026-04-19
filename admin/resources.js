@@ -1,7 +1,37 @@
 const crypto = require('crypto');
-const { User, Category, Product, Order, OrderItem, Setting } = require('../models');
+const { User, Category, Product, Order, OrderItem } = require('../models');
 
+/** RBAC: `role` comes from `User` via `authenticate()` → `currentAdmin`. */
 const isAdmin = ({ currentAdmin }) => currentAdmin?.role === 'admin';
+
+/** Admin or store customer — catalog + own orders (never the Users resource). */
+const isStoreRole = ({ currentAdmin }) =>
+  currentAdmin?.role === 'admin' || currentAdmin?.role === 'user';
+
+/** Inject human-readable lines into Order show (and edit) JSON — Sequelize hasMany is not a listable AdminJS field by default. */
+async function orderRecordLineItemsAfter(response) {
+  const rid = response.record?.params?.id;
+  if (rid == null) return response;
+
+  const items = await OrderItem.findAll({
+    where: { orderId: rid },
+    include: [{ model: Product, as: 'product', attributes: ['id', 'name'] }],
+    order: [['id', 'ASC']],
+  });
+
+  const lines = items.map((row) => {
+    const name = row.product ? row.product.name : `Product #${row.productId}`;
+    const unit = Number(row.unitPrice);
+    const qty = Number(row.quantity);
+    const sub = unit * qty;
+    return `${name}  × ${qty}  @ $${unit.toFixed(2)}  =  $${sub.toFixed(2)}`;
+  });
+
+  response.record.params.lineItemsPreview =
+    lines.length > 0 ? lines.join('\n') : 'No line items for this order.';
+
+  return response;
+}
 
 const passwordHidden = {
   isVisible: {
@@ -30,14 +60,39 @@ const orderListBefore = async (request, context) => {
   if (context.currentAdmin?.role === 'admin') {
     return request;
   }
-  const q = request.query || {};
-  return {
-    ...request,
-    query: {
-      ...q,
-      'filters.userId': context.currentAdmin.id,
-    },
-  };
+  const q = { ...(request.query || {}) };
+  Object.keys(q).forEach((key) => {
+    if (key === 'filters.userId' || key.startsWith('filters.userId.')) {
+      delete q[key];
+    }
+  });
+  q['filters.userId'] = context.currentAdmin.id;
+  return { ...request, query: q };
+};
+
+const orderItemListBefore = async (request, context) => {
+  if (context.currentAdmin?.role === 'admin') {
+    return request;
+  }
+  const q = { ...(request.query || {}) };
+  Object.keys(q).forEach((key) => {
+    if (key === 'filters.orderId' || key.startsWith('filters.orderId.')) {
+      delete q[key];
+    }
+  });
+  const orderRows = await Order.findAll({
+    where: { userId: context.currentAdmin.id },
+    attributes: ['id'],
+    raw: true,
+  });
+  if (orderRows.length === 0) {
+    q['filters.orderId'] = '0';
+    return { ...request, query: q };
+  }
+  orderRows.forEach((row, i) => {
+    q[`filters.orderId.${i}`] = String(row.id);
+  });
+  return { ...request, query: q };
 };
 
 const catalogNav = {
@@ -54,15 +109,18 @@ const userResource = {
       icon: 'User',
     },
     properties: {
+      name: {
+        isTitle: true,
+      },
       password: {
         ...passwordHidden,
         type: 'password',
       },
     },
-    listProperties: ['id', 'email', 'role', 'createdAt'],
-    showProperties: ['id', 'email', 'role', 'createdAt', 'updatedAt'],
-    editProperties: ['email', 'role'],
-    newProperties: ['email', 'role'],
+    listProperties: ['id', 'name', 'email', 'role', 'createdAt'],
+    showProperties: ['id', 'name', 'email', 'role', 'createdAt', 'updatedAt'],
+    editProperties: ['name', 'email', 'role'],
+    newProperties: ['name', 'email', 'role'],
     actions: {
       list: { isAccessible: isAdmin },
       new: {
@@ -77,6 +135,7 @@ const userResource = {
       },
       edit: { isAccessible: isAdmin },
       delete: { isAccessible: isAdmin },
+      bulkDelete: { isAccessible: isAdmin },
       show: { isAccessible: isAdmin },
       search: { isAccessible: isAdmin },
     },
@@ -92,6 +151,15 @@ const categoryResource = {
     properties: {
       products: { isVisible: { list: true, show: true } },
     },
+    actions: {
+      list: { isAccessible: isStoreRole },
+      show: { isAccessible: isStoreRole },
+      search: { isAccessible: isStoreRole },
+      new: { isAccessible: isAdmin },
+      edit: { isAccessible: isAdmin },
+      delete: { isAccessible: isAdmin },
+      bulkDelete: { isAccessible: isAdmin },
+    },
   },
 };
 
@@ -104,6 +172,15 @@ const productResource = {
     properties: {
       category: { isVisible: { list: true, show: true, filter: true } },
     },
+    actions: {
+      list: { isAccessible: isStoreRole },
+      show: { isAccessible: isStoreRole },
+      search: { isAccessible: isStoreRole },
+      new: { isAccessible: isAdmin },
+      edit: { isAccessible: isAdmin },
+      delete: { isAccessible: isAdmin },
+      bulkDelete: { isAccessible: isAdmin },
+    },
   },
 };
 
@@ -112,17 +189,47 @@ const orderResource = {
   options: {
     navigation: catalogNav,
     listProperties: ['id', 'status', 'total', 'userId', 'createdAt'],
-    showProperties: ['id', 'status', 'total', 'userId', 'createdAt', 'updatedAt'],
+    showProperties: [
+      'id',
+      'status',
+      'total',
+      'userId',
+      'lineItemsPreview',
+      'createdAt',
+      'updatedAt',
+    ],
     properties: {
-      user: { isVisible: { list: true, show: true } },
-      orderItems: { isVisible: { list: false, show: true } },
+      status: {
+        availableValues: [
+          { value: 'pending', label: 'pending' },
+          { value: 'paid', label: 'paid' },
+          { value: 'cancelled', label: 'cancelled' },
+        ],
+      },
+      // Sequelize adapter only exposes columns; `user` was a virtual field and stayed empty in lists.
+      // Point FK at the `users` resource so AdminJS can populate the related record (title = user name).
+      userId: {
+        reference: 'users',
+        label: 'Customer',
+      },
+      lineItemsPreview: {
+        label: 'Included items',
+        type: 'textarea',
+        isVisible: { list: false, show: true, filter: false, edit: false, new: false },
+        description: 'Products in this order (unit price × quantity per line).',
+        props: { rows: 12 },
+      },
     },
     actions: {
-      list: { before: orderListBefore },
-      show: { isAccessible: orderOwnedByCurrentUser },
+      list: { before: orderListBefore, isAccessible: isStoreRole },
+      show: {
+        isAccessible: orderOwnedByCurrentUser,
+        after: orderRecordLineItemsAfter,
+      },
       edit: { isAccessible: isAdmin },
       new: { isAccessible: isAdmin },
       delete: { isAccessible: isAdmin },
+      bulkDelete: { isAccessible: isAdmin },
     },
   },
 };
@@ -138,32 +245,13 @@ const orderItemResource = {
       product: { isVisible: { list: true, show: true, filter: true } },
     },
     actions: {
-      list: { isAccessible: isAdmin },
+      list: { before: orderItemListBefore, isAccessible: isStoreRole },
       search: { isAccessible: isAdmin },
       new: { isAccessible: isAdmin },
       edit: { isAccessible: isAdmin },
       delete: { isAccessible: isAdmin },
+      bulkDelete: { isAccessible: isAdmin },
       show: { isAccessible: orderItemShowAccessible },
-    },
-  },
-};
-
-const settingResource = {
-  resource: Setting,
-  options: {
-    navigation: {
-      name: null,
-      icon: 'Settings',
-    },
-    listProperties: ['id', 'key', 'value', 'updatedAt'],
-    showProperties: ['id', 'key', 'value', 'createdAt', 'updatedAt'],
-    actions: {
-      list: { isAccessible: isAdmin },
-      new: { isAccessible: isAdmin },
-      edit: { isAccessible: isAdmin },
-      delete: { isAccessible: isAdmin },
-      show: { isAccessible: isAdmin },
-      search: { isAccessible: isAdmin },
     },
   },
 };
@@ -174,11 +262,11 @@ const resources = [
   productResource,
   orderResource,
   orderItemResource,
-  settingResource,
 ];
 
 module.exports = {
   resources,
   isAdmin,
+  isStoreRole,
   passwordHidden,
 };

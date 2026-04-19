@@ -50,7 +50,7 @@ router.post('/login', async (req, res) => {
 router.get('/me', requireJwt, async (req, res) => {
   try {
     const user = await User.findByPk(req.auth.sub, {
-      attributes: ['id', 'email', 'role', 'createdAt'],
+      attributes: ['id', 'name', 'email', 'role', 'createdAt'],
     });
     if (!user) {
       return res.status(401).json({
