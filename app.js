@@ -7,7 +7,6 @@ const AdminJSSequelize = require('@adminjs/sequelize');
 const { sequelize, User } = require('./models');
 const healthRouter = require('./routes/health');
 const authRouter = require('./routes/auth');
-const requestLogger = require('./middleware/requestLogger');
 const { createAdminJs } = require('./admin/setup');
 
 AdminJS.registerAdapter({
@@ -23,7 +22,6 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 
 app.disable('x-powered-by');
-app.use(requestLogger);
 
 app.use('/api', healthRouter);
 app.use('/api', express.json());
