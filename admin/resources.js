@@ -3,6 +3,31 @@ const { User, Category, Product, Order, OrderItem, Setting } = require('../model
 
 const isAdmin = ({ currentAdmin }) => currentAdmin?.role === 'admin';
 
+/** Inject human-readable lines into Order show (and edit) JSON — Sequelize hasMany is not a listable AdminJS field by default. */
+async function orderRecordLineItemsAfter(response) {
+  const rid = response.record?.params?.id;
+  if (rid == null) return response;
+
+  const items = await OrderItem.findAll({
+    where: { orderId: rid },
+    include: [{ model: Product, as: 'product', attributes: ['id', 'name'] }],
+    order: [['id', 'ASC']],
+  });
+
+  const lines = items.map((row) => {
+    const name = row.product ? row.product.name : `Product #${row.productId}`;
+    const unit = Number(row.unitPrice);
+    const qty = Number(row.quantity);
+    const sub = unit * qty;
+    return `${name}  × ${qty}  @ $${unit.toFixed(2)}  =  $${sub.toFixed(2)}`;
+  });
+
+  response.record.params.lineItemsPreview =
+    lines.length > 0 ? lines.join('\n') : 'No line items for this order.';
+
+  return response;
+}
+
 const passwordHidden = {
   isVisible: {
     list: false,
@@ -112,14 +137,32 @@ const orderResource = {
   options: {
     navigation: catalogNav,
     listProperties: ['id', 'status', 'total', 'userId', 'createdAt'],
-    showProperties: ['id', 'status', 'total', 'userId', 'createdAt', 'updatedAt'],
+    showProperties: [
+      'id',
+      'status',
+      'total',
+      'userId',
+      'user',
+      'lineItemsPreview',
+      'createdAt',
+      'updatedAt',
+    ],
     properties: {
       user: { isVisible: { list: true, show: true } },
-      orderItems: { isVisible: { list: false, show: true } },
+      lineItemsPreview: {
+        label: 'Included items',
+        type: 'textarea',
+        isVisible: { list: false, show: true, filter: false, edit: false, new: false },
+        description: 'Products in this order (unit price × quantity per line).',
+        props: { rows: 12 },
+      },
     },
     actions: {
       list: { before: orderListBefore },
-      show: { isAccessible: orderOwnedByCurrentUser },
+      show: {
+        isAccessible: orderOwnedByCurrentUser,
+        after: orderRecordLineItemsAfter,
+      },
       edit: { isAccessible: isAdmin },
       new: { isAccessible: isAdmin },
       delete: { isAccessible: isAdmin },

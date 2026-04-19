@@ -11,6 +11,11 @@ const componentLoader = new ComponentLoader();
 const DashboardComponent = componentLoader.add('EcomDashboard', path.join(__dirname, 'dashboard.jsx'));
 const SettingsPageComponent = componentLoader.add('EcomSettingsPage', path.join(__dirname, 'settings.jsx'));
 
+/** Treat these order statuses as completed for revenue + completed counts */
+const COMPLETED_STATUSES = ['paid', 'shipped'];
+/** Products at or below this stock level count as low stock */
+const LOW_STOCK_MAX = 10;
+
 async function dashboardHandler(request, response, context) {
   const { currentAdmin } = context;
   if (!currentAdmin) {
@@ -19,15 +24,41 @@ async function dashboardHandler(request, response, context) {
 
   if (currentAdmin.role === 'admin') {
     const { User, Order, Product, Category } = models;
-    const [userCount, orderCount, productCount, categoryCount, revenueRaw] = await Promise.all([
+
+    const [
+      userCount,
+      orderCount,
+      productCount,
+      categoryCount,
+      pendingOrders,
+      completedOrders,
+      revenueRaw,
+      lowStockProducts,
+      recentOrderRows,
+    ] = await Promise.all([
       User.count(),
       Order.count(),
       Product.count(),
       Category.count(),
-      Order.sum('total', {
-        where: { status: { [Op.in]: ['paid', 'shipped'] } },
+      Order.count({ where: { status: 'pending' } }),
+      Order.count({ where: { status: { [Op.in]: COMPLETED_STATUSES } } }),
+      Order.sum('total', { where: { status: { [Op.in]: COMPLETED_STATUSES } } }),
+      Product.count({ where: { stock: { [Op.lte]: LOW_STOCK_MAX } } }),
+      Order.findAll({
+        limit: 5,
+        order: [['createdAt', 'DESC']],
+        attributes: ['id', 'status', 'total', 'createdAt'],
+        include: [{ model: User, as: 'user', attributes: ['email'] }],
       }),
     ]);
+
+    const recentOrders = recentOrderRows.map((row) => ({
+      id: row.id,
+      status: row.status,
+      total: Number(row.total),
+      createdAt: row.createdAt,
+      customerEmail: row.user ? row.user.email : '',
+    }));
 
     return {
       role: 'admin',
@@ -36,18 +67,57 @@ async function dashboardHandler(request, response, context) {
         orderCount,
         productCount,
         categoryCount,
-        revenue: Number(revenueRaw || 0),
+        pendingOrders,
+        completedOrders,
+        totalRevenue: Number(revenueRaw || 0),
+        lowStockProducts,
+        lowStockThreshold: LOW_STOCK_MAX,
       },
+      recentOrders,
     };
   }
 
-  const recentOrders = await models.Order.findAll({
-    where: { userId: currentAdmin.id },
-    order: [['createdAt', 'DESC']],
-    limit: 5,
-    attributes: ['id', 'status', 'total', 'createdAt'],
-    raw: true,
-  });
+  const userId = currentAdmin.id;
+  const { Order, OrderItem, Product } = models;
+
+  const [recentOrders, itemRows] = await Promise.all([
+    Order.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']],
+      limit: 5,
+      attributes: ['id', 'status', 'total', 'createdAt'],
+      raw: true,
+    }),
+    OrderItem.findAll({
+      attributes: ['id', 'orderId', 'productId', 'quantity', 'unitPrice'],
+      include: [
+        {
+          model: Order,
+          as: 'order',
+          required: true,
+          where: { userId },
+          attributes: ['id', 'status'],
+        },
+        {
+          model: Product,
+          as: 'product',
+          required: true,
+          attributes: ['name'],
+        },
+      ],
+      order: [['id', 'DESC']],
+      limit: 12,
+    }),
+  ]);
+
+  const recentOrderItems = itemRows.map((row) => ({
+    id: row.id,
+    orderId: row.orderId,
+    quantity: row.quantity,
+    unitPrice: Number(row.unitPrice),
+    productName: row.product ? row.product.name : '',
+    orderStatus: row.order ? row.order.status : '',
+  }));
 
   return {
     role: 'user',
@@ -57,6 +127,7 @@ async function dashboardHandler(request, response, context) {
       role: currentAdmin.role,
     },
     recentOrders,
+    recentOrderItems,
   };
 }
 
