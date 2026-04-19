@@ -1,26 +1,35 @@
 const authService = require('../services/authService');
 
-/**
- * Requires `Authorization: Bearer <token>`. Sets `req.auth` to JWT payload.
- */
+// Express middleware: runs before your route. Call next() only if the user is allowed in.
+
 function requireJwt(req, res, next) {
-  const header = req.headers.authorization;
-  if (!header || !header.startsWith('Bearer ')) {
+  // Example header: Authorization: Bearer eyJhbGciOiJIUzI1NiIs...
+  const headerValue = req.headers.authorization;
+
+  if (headerValue === undefined || headerValue === '') {
     return res.status(401).json({
       success: false,
-      error: { code: 'NO_TOKEN', message: 'Authorization Bearer token is required' },
+      error: { code: 'NO_TOKEN', message: 'Missing Authorization header' },
     });
   }
-  const token = header.slice(7).trim();
-  if (!token) {
+
+  const parts = headerValue.split(' ');
+  const wordBearer = parts[0];
+  const tokenString = parts[1];
+
+  const looksLikeBearerToken = parts.length === 2 && wordBearer === 'Bearer' && tokenString;
+
+  if (!looksLikeBearerToken) {
     return res.status(401).json({
       success: false,
-      error: { code: 'NO_TOKEN', message: 'Authorization Bearer token is required' },
+      error: { code: 'NO_TOKEN', message: 'Use: Authorization: Bearer <token>' },
     });
   }
+
   try {
-    req.auth = authService.verifyAccessToken(token);
-    return next();
+    const decodedPayload = authService.verifyAccessToken(tokenString);
+    req.auth = decodedPayload;
+    next();
   } catch {
     return res.status(401).json({
       success: false,
