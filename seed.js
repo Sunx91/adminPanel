@@ -2,12 +2,6 @@ require('dotenv').config();
 const { sequelize, User, Category, Product, Order, OrderItem, Setting } = require('./models');
 
 async function seed() {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SEED_IN_PRODUCTION !== 'true') {
-    throw new Error(
-      'Refusing to seed in NODE_ENV=production. Set ALLOW_SEED_IN_PRODUCTION=true once if you really intend to wipe and reseed production.'
-    );
-  }
-
   await sequelize.sync({ force: true });
 
   await User.create({
@@ -22,8 +16,8 @@ async function seed() {
     role: 'user',
   });
 
-  const catElectronics = await Category.create({ name: 'Electronics', slug: 'electronics' });
-  const catBooks = await Category.create({ name: 'Books', slug: 'books' });
+  const catElectronics = await Category.create({ name: 'Electronics' });
+  const catBooks = await Category.create({ name: 'Books' });
 
   const p1 = await Product.create({
     name: 'Wireless Mouse',
@@ -81,11 +75,7 @@ async function seed() {
   });
 
   // eslint-disable-next-line no-console
-  console.log('Seed complete.');
-  // eslint-disable-next-line no-console
-  console.log('Admin: admin@example.com / admin123');
-  // eslint-disable-next-line no-console
-  console.log('User:  user@example.com / user123');
+  console.log('Seed OK — admin@example.com / admin123   user@example.com / user123');
 }
 
 seed()

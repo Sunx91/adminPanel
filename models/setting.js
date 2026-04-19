@@ -4,11 +4,6 @@ module.exports = (sequelize) => {
   const Setting = sequelize.define(
     'Setting',
     {
-      id: {
-        type: DataTypes.INTEGER,
-        primaryKey: true,
-        autoIncrement: true,
-      },
       key: {
         type: DataTypes.STRING,
         allowNull: false,
@@ -19,10 +14,7 @@ module.exports = (sequelize) => {
         allowNull: true,
       },
     },
-    {
-      tableName: 'settings',
-      timestamps: true,
-    }
+    { tableName: 'settings' }
   );
 
   Setting.associate = () => {};
