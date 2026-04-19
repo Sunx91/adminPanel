@@ -1,5 +1,9 @@
 require('dotenv').config();
+const fs = require('fs');
+const path = require('path');
 const express = require('express');
+const swaggerUi = require('swagger-ui-express');
+const YAML = require('yaml');
 const bcrypt = require('bcrypt');
 const AdminJS = require('adminjs');
 const AdminJSExpress = require('@adminjs/express');
@@ -29,8 +33,27 @@ app.use('/api', healthRouter);
 app.use('/api', express.json());
 app.use('/api', authRouter);
 
+const openApiPath = path.join(__dirname, 'docs', 'openapi.yaml');
+const openApiDocument = YAML.parse(fs.readFileSync(openApiPath, 'utf8'));
+app.use(
+  '/api/docs',
+  swaggerUi.serve,
+  swaggerUi.setup(openApiDocument, {
+    customSiteTitle: 'E-commerce Admin API',
+    swaggerOptions: {
+      persistAuthorization: true,
+      docExpansion: 'list',
+      filter: true,
+      tagsSorter: 'alpha',
+      operationsSorter: 'alpha',
+    },
+  })
+);
+
 async function start() {
   await sequelize.authenticate();
+  // eslint-disable-next-line no-console
+  console.log('[OK] Database connected (PostgreSQL).');
 
   if (process.env.DB_SYNC === 'true') {
     await sequelize.sync({ alter: true });
@@ -67,7 +90,11 @@ async function start() {
 
   app.listen(PORT, () => {
     // eslint-disable-next-line no-console
-    console.log(`http://localhost:${PORT}${adminJs.options.rootPath}`);
+    console.log(`[OK] Server running on http://localhost:${PORT}`);
+    // eslint-disable-next-line no-console
+    console.log(`     AdminJS: http://localhost:${PORT}${adminJs.options.rootPath}`);
+    // eslint-disable-next-line no-console
+    console.log(`     API docs (OpenAPI): http://localhost:${PORT}/api/docs`);
   });
 }
 

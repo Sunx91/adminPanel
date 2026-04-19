@@ -1,0 +1,284 @@
+openapi: 3.0.3
+info:
+  title: E-commerce Admin API
+  version: 1.0.0
+  description: |
+    REST API for the AdminJS e-commerce admin backend.
+
+    **Authentication:** call `POST /api/login` with email and password. On success, use the returned
+    `data.token` as a Bearer token in the `Authorization` header for protected routes
+    (`Authorization: Bearer <token>`).
+servers:
+  - url: http://localhost:{port}
+    description: Local development
+    variables:
+      port:
+        default: "3000"
+        description: HTTP port (see `PORT` in environment)
+
+tags:
+  - name: Auth
+    description: JWT-based authentication
+  - name: Health
+    description: Service and database readiness
+
+paths:
+  /api/login:
+    post:
+      tags:
+        - Auth
+      summary: Log in and obtain a JWT
+      description: >
+        Validates credentials against the database (bcrypt). Returns a Bearer access token and a
+        public user payload (no password hash).
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LoginRequest"
+            examples:
+              validRequest:
+                summary: Typical login body
+                value:
+                  email: admin@example.com
+                  password: "your-secure-password"
+      responses:
+        "200":
+          description: Credentials accepted; JWT issued.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LoginSuccessResponse"
+              examples:
+                success:
+                  value:
+                    success: true
+                    data:
+                      token: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.example
+                      tokenType: Bearer
+                      expiresIn: 8h
+                      user:
+                        id: 1
+                        email: admin@example.com
+                        role: admin
+        "400":
+          description: Validation error (missing or empty email/password).
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                validation:
+                  value:
+                    success: false
+                    error:
+                      code: VALIDATION_ERROR
+                      message: Email and password are required
+        "401":
+          description: Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                invalidCredentials:
+                  value:
+                    success: false
+                    error:
+                      code: INVALID_CREDENTIALS
+                      message: Invalid email or password
+        "500":
+          description: Unexpected server error while processing login.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+              examples:
+                serverError:
+                  value:
+                    success: false
+                    error:
+                      code: SERVER_ERROR
+                      message: Login could not be completed
+
+  /api/health:
+    get:
+      tags:
+        - Health
+      summary: Server and database health
+      description: >
+        Returns process uptime and verifies a live PostgreSQL connection via Sequelize
+        (`authenticate`). If the database cannot be reached, the response uses HTTP 503.
+      operationId: getHealth
+      responses:
+        "200":
+          description: HTTP server is up and the database connection succeeded.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthOkResponse"
+              examples:
+                healthy:
+                  value:
+                    status: ok
+                    uptime: 42.5
+                    timestamp: "2026-04-19T12:00:00.000Z"
+                    database: connected
+        "503":
+          description: HTTP server is running but the database is not reachable.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthErrorResponse"
+              examples:
+                dbDown:
+                  value:
+                    status: error
+                    uptime: 12.3
+                    timestamp: "2026-04-19T12:00:00.000Z"
+                    database: disconnected
+                    error: Database connection failed
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >
+        JWT from `POST /api/login` (`data.token`). Send as `Authorization: Bearer <token>`.
+
+  schemas:
+    LoginRequest:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          example: admin@example.com
+        password:
+          type: string
+          format: password
+          minLength: 1
+          writeOnly: true
+
+    PublicUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum:
+            - admin
+            - user
+          description: Application role used for AdminJS access control.
+
+    LoginSuccessResponse:
+      type: object
+      required:
+        - success
+        - data
+      properties:
+        success:
+          type: boolean
+          enum: [true]
+        data:
+          type: object
+          required:
+            - token
+            - tokenType
+            - expiresIn
+            - user
+          properties:
+            token:
+              type: string
+              description: JWT access token.
+            tokenType:
+              type: string
+              enum: [Bearer]
+            expiresIn:
+              type: string
+              description: JWT `expiresIn` value (e.g. from `JWT_EXPIRES_IN`).
+              example: 8h
+            user:
+              $ref: "#/components/schemas/PublicUser"
+
+    ErrorResponse:
+      type: object
+      required:
+        - success
+        - error
+      properties:
+        success:
+          type: boolean
+          enum: [false]
+        error:
+          type: object
+          required:
+            - code
+            - message
+          properties:
+            code:
+              type: string
+              example: INVALID_CREDENTIALS
+            message:
+              type: string
+              example: Invalid email or password
+
+    HealthOkResponse:
+      type: object
+      required:
+        - status
+        - uptime
+        - timestamp
+        - database
+      properties:
+        status:
+          type: string
+          enum: [ok]
+        uptime:
+          type: number
+          format: double
+          description: Process uptime in seconds.
+        timestamp:
+          type: string
+          format: date-time
+        database:
+          type: string
+          enum: [connected]
+
+    HealthErrorResponse:
+      type: object
+      required:
+        - status
+        - uptime
+        - timestamp
+        - database
+        - error
+      properties:
+        status:
+          type: string
+          enum: [error]
+        uptime:
+          type: number
+          format: double
+        timestamp:
+          type: string
+          format: date-time
+        database:
+          type: string
+          enum: [disconnected]
+        error:
+          type: string
+          example: Database connection failed
